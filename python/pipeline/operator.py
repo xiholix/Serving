@@ -90,7 +90,7 @@ class Op(object):
             name = _op_name_gen.next()
         self.name = name  # to identify the type of OP, it must be globally unique
         self.concurrency = concurrency  # amount of concurrency
-        self.set_input_ops(input_ops)
+        self.set_input_ops(input_ops) #xhl 具体功能待明确
         self.set_jump_to_ops(jump_to_ops)
 
         self._local_service_handler = local_service_handler
@@ -120,7 +120,7 @@ class Op(object):
         self._succ_init_op = False
         self._succ_close_op = False
         self.dynamic_shape_info = {}
-        self.set_dynamic_shape_info()
+        self.set_dynamic_shape_info() #xhl 具体作用
 
     def set_dynamic_shape_info(self):
         """
@@ -132,7 +132,7 @@ class Op(object):
 
     # for feed/fetch dict cehck
     @staticmethod
-    def get_feed_fetch_list(client):
+    def get_feed_fetch_list(client): #xhl 用于兼容不同模式feed和fetch的获取逻辑
         from paddle_serving_app.local_predict import LocalPredictor
         if isinstance(client, Client):
             feed_names = client.get_feed_names()
@@ -202,6 +202,32 @@ class Op(object):
         self.mkldnn_bf16_op_list = None
         self.min_subgraph_size = 3
         self.use_calib = False
+
+        '''
+        xhl 逻辑分支：
+        self._server_endpoints:
+            if len(server_endpoints) != 0:
+                self.with_serving=True
+                self._server_endpoints self.client_type
+            else:
+                if self._local_service_handler is None:
+                    local_service_conf
+                    if self.model_config:
+                        self.with_serving=False
+                    else:
+                        self.with_serving = True
+                    
+                    self._local_service_handler = service_handler
+                else:
+                    self._local_service_handler.prepare_server
+                    
+        else:
+            self.with_serving=True
+
+        
+        所以只要是读取配置，以及将_local_service_handler处理好
+        
+        '''
 
         if self._server_endpoints is None:
             server_endpoints = conf.get("server_endpoints", [])
@@ -393,6 +419,8 @@ class Op(object):
 
         Returns:
             client: client object.
+
+        xhl 返回client，其中保存了一些属性，后面可以看看有啥不同 right_fetch_names和 _fetch_names
         """
         if self.with_serving == False:
             _LOGGER.info("Op({}) has no client (and it also do not "
@@ -836,7 +864,7 @@ class Op(object):
         #Init cuda env in main thread
         if self.client_type == "local_predictor":
             _LOGGER.info("Init cuda env in main thread")
-            self.local_predictor = self._local_service_handler.get_client(0)
+            self.local_predictor = self._local_service_handler.get_client(0) #xhl 与init里的方法冲突待定
 
         threads = []
         for concurrency_idx in range(self.concurrency):
@@ -975,7 +1003,7 @@ class Op(object):
         input_offset_dict = {}
         batch_input = False
 
-        if isinstance(one_input, dict):
+        if isinstance(one_input, dict): #xhl 若单个输入是dict类型，则将batch内的不同样例的按key合并生成一个dict
             # For dict type, data structure is dict.
             # Merge multiple dicts for data_ids into one dict.
             # feed_batch is the input param of predict func.
@@ -1003,7 +1031,7 @@ class Op(object):
                     else:
                         cur_offset += 1
                     break
-                input_offset_dict[data_id] = [start, cur_offset]
+                input_offset_dict[data_id] = [start, cur_offset] #xhl 计算每个样例的偏移量，每个基础元素算1，列表算列表元素量
         elif isinstance(one_input, list):
             # For list type, data structure of one_input is [dict, dict, ...]
             # Data structure of feed_batch is [dict1_1, dict1_2, dict2_1, ...]   
@@ -1045,7 +1073,7 @@ class Op(object):
                     for idx in range(len(feed_batch)):
                         predict_res, error_code, error_info = self.process(
                             [feed_batch[idx]], typical_logid)
-                        if error_code != ChannelDataErrcode.OK.value:
+                        if error_code != ChannelDataErrcode.OK.value: #xhl 若batch内有一个调用报错就不会进行后续的样例预测了
                             break
                         midped_batch.append(predict_res)
             except Exception as e:
@@ -1108,7 +1136,7 @@ class Op(object):
             return midped_data_dict, err_channeldata_dict
 
         # Split batch infer result to each data_ids
-        if batch_input is False:
+        if batch_input is False: #xhl待定 后续可以看看是否存在有多个数据但是没有batch的情况
             var_names = midped_batch.keys()
             lod_var_names = set()
             lod_offset_names = set()
@@ -1297,6 +1325,8 @@ class Op(object):
             need_profile_dict: need profile dict in batch 
             profile_dict: profile info dict in batch
             logid_dict: trace each request in batch
+
+        xhl 只有出错才会写入output_channels里
         """
         parsed_data_dict = collections.OrderedDict()
         need_profile_dict = {}
@@ -1490,7 +1520,7 @@ class Op(object):
             _LOGGER.debug("op:{} process_end:{}, cost:{}".format(
                 op_info_prefix, time.time(), midp_time))
             try:
-                for data_id, err_channeldata in err_channeldata_dict.items():
+                for data_id, err_channeldata in err_channeldata_dict.items(): #xhl 需要确认为什么可以直接把错误输出到channel
                     self._push_to_output_channels(
                         data=err_channeldata,
                         channels=output_channels,

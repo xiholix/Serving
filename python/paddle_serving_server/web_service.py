@@ -16,7 +16,7 @@
 
 # Now, this is only for Pipeline.
 from flask import Flask, request, abort
-from contextlib import closing
+from contextlib import closing #xhl 配合with语句保证对应block肯定调用close方法
 from multiprocessing import Pool, Process, Queue
 from paddle_serving_client import Client
 from paddle_serving_server import OpMaker, OpSeqMaker, Server
@@ -26,7 +26,7 @@ import sys
 import numpy as np
 import os
 from paddle_serving_server import pipeline
-from paddle_serving_server.pipeline import Op
+from paddle_serving_server.pipeline import Op #xhl 通过setup.py.server.in配置可以将pipeline目录作为paddle_serving_server的子模块
 from paddle_serving_server.serve import format_gpu_to_strlist
 from paddle_serving_server.util import dump_pid_file
 
@@ -40,7 +40,13 @@ def port_is_available(port):
     else:
         return False
 
+'''
+xhl: 类解读
+1. Webservice类是一个基类，后续实际的类会重载该类的 get_pipeline_response从而保证功能逻辑正确
+   a. get_pipeline_response里会涉及到一些op的定义，主要是做preprocess和postprocess
 
+2. 使用时会调用prepare_pipeline_config和run_service方法
+'''
 class WebService(object):
     def __init__(self, name="default_service"):
         self.name = name
@@ -61,9 +67,9 @@ class WebService(object):
             raise ValueError("The return value type of `get_pipeline_response` "
                              "function is not Op type, please check function "
                              "`get_pipeline_response`.")
-        response_op = pipeline.ResponseOp(input_ops=[last_op])
-        self._server.set_response_op(response_op)
-        self._server.prepare_server(yml_file=yml_file, yml_dict=yml_dict)
+        response_op = pipeline.ResponseOp(input_ops=[last_op]) #xhl 主要干什么？
+        self._server.set_response_op(response_op) 
+        self._server.prepare_server(yml_file=yml_file, yml_dict=yml_dict) #xhl 会完成什么动作
 
     def run_service(self):
         self._server.run_server()

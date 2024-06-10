@@ -164,7 +164,7 @@ class PipelineServer(object):
             raise Exception("Failed to set response_op: response_op "
                             "can only have one previous op.")
         self._response_op = response_op
-        self._used_op, _ = dag.DAG.get_use_ops(self._response_op)
+        self._used_op, _ = dag.DAG.get_use_ops(self._response_op) #xhl 获取到拓扑排序的上游节点
 
     def prepare_server(self, yml_file=None, yml_dict=None):
         """
@@ -177,6 +177,8 @@ class PipelineServer(object):
    
         Returns:
             None 
+        
+        xhl 先调用set_response_op方法然后再调用这个方法
         """
         conf = ServerYamlConfChecker.load_server_yaml_conf(
             yml_file=yml_file, yml_dict=yml_dict)

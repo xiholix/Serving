@@ -90,6 +90,8 @@ def dump_pid_file(portList, model):
     .. code-block:: python
 
        dump_pid_file([9494, 10082], 'serve')
+
+    xhl 将portlist的进程信息写入到ProcessInfo.json中，若存在重复的历史端口信息，则移除该无用信息
     '''
     pid = os.getpid()
     if platform.system() == "Windows":
